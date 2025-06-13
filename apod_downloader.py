@@ -5,6 +5,7 @@ import sys
 import json
 import requests
 import subprocess
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -69,7 +70,22 @@ def set_gnome_background(image_path):
         subprocess.run(cmd, check=True)
     print(f"Set desktop background to {image_path}")
 
+def is_valid_date(date_str):
+    try:
+        # Try to create a datetime object with the given format
+        datetime.strptime(date_str, "%Y-%d-%m")
+        return True
+    except ValueError:
+        # If a ValueError is raised, the format is incorrect
+        return False
+
+
 def main(date_str, set_bg=False):
+
+    if not is_valid_date(date_str):
+        print(f'error invalid date string {date_str}')
+        sys.exit(1)
+
     data = load_apod_json()
 
     # If image already exists in JSON, use it
