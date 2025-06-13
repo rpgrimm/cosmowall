@@ -73,10 +73,11 @@ def set_gnome_background(image_path):
 def is_valid_date(date_str):
     try:
         # Try to create a datetime object with the given format
-        datetime.strptime(date_str, "%Y-%d-%m")
+        datetime.strptime(date_str, "%Y-%m-%d")
         return True
-    except ValueError:
+    except ValueError as e:
         # If a ValueError is raised, the format is incorrect
+        print(f"Invalid date format: {e}")
         return False
 
 
@@ -129,7 +130,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("date", help="Date in YYYY-MM-DD format")
+    parser.add_argument("date", help="Date in ISO 8601 YYYY-MM-DD format")
     parser.add_argument("--set-bg", action="store_true", help="Set the APOD image as GNOME background")
     args = parser.parse_args()
 
