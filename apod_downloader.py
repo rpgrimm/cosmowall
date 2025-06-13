@@ -80,8 +80,28 @@ def is_valid_date(date_str):
         print(f"Invalid date format: {e}")
         return False
 
+def list_cached_apods():
+    data = load_apod_json()
+    if not data:
+        print("No cached APODs found.")
+        return
 
-def main(date_str, set_bg=False):
+    for date_str, entry in sorted(data.items()):
+        title = entry.get("title", "No Title")
+        explanation = entry.get("explanation", "No explanation")
+        print(f"🗓️ {date_str}: {title}\n   {explanation[:200]}...\n")
+
+
+
+def main(date_str=None, set_bg=False, list_cached=False):
+
+    if list_cached:
+        list_cached_apods()
+        return
+
+    if not date_str:
+        print("Date is required unless --list-cached is used.")
+        sys.exit(1)
 
     if not is_valid_date(date_str):
         print(f'error invalid date string {date_str}')
@@ -130,9 +150,10 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("date", help="Date in ISO 8601 YYYY-MM-DD format")
+    parser.add_argument("date", nargs="?", help="Date in ISO 8601 YYYY-MM-DD format")
     parser.add_argument("--set-bg", action="store_true", help="Set the APOD image as GNOME background")
+    parser.add_argument("--list-cached", action="store_true", help="List cached APOD images")
     args = parser.parse_args()
 
-    main(args.date, set_bg=args.set_bg)
+    main(args.date, set_bg=args.set_bg, list_cached=args.list_cached)
 
