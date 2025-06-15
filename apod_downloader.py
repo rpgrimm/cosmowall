@@ -5,7 +5,7 @@ import sys
 import json
 import requests
 import subprocess
-from datetime import datetime
+from datetime import datetime,timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -94,6 +94,9 @@ def list_cached_apods():
 
 
 def main(date_str=None, set_bg=False, list_cached=False):
+    # Handle --today
+    if date_str == "__TODAY__":
+        date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
     if list_cached:
         list_cached_apods()
@@ -150,10 +153,17 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("date", nargs="?", help="Date in ISO 8601 YYYY-MM-DD format")
+    parser.add_argument("date", nargs="?", help="Date in ISO 8601 YYYY-MM-DD format (use 'TODAY' to fetch today's APOD)")
     parser.add_argument("--set-bg", action="store_true", help="Set the APOD image as GNOME background")
     parser.add_argument("--list-cached", action="store_true", help="List cached APOD images")
+    parser.add_argument("--today", action="store_true", help="Shortcut for today's date")
     args = parser.parse_args()
 
-    main(args.date, set_bg=args.set_bg, list_cached=args.list_cached)
+    # Determine date argument
+    date_arg = None
+    if args.today:
+        date_arg = "__TODAY__"
+    elif args.date:
+        date_arg = args.date
 
+    main(date_arg, set_bg=args.set_bg, list_cached=args.list_cached)
