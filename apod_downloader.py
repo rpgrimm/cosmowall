@@ -57,6 +57,27 @@ def update_apod_json(date_str, meta, image_path):
     }
     save_apod_json(data)
 
+def get_desktop_env():
+
+    if "XDG_CURRENT_DESKTOP" in os.environ:
+        if os.environ['XDG_CURRENT_DESKTOP'] == 'ubuntu:GNOME':
+            return 'ubuntu:GNOME'
+
+    try:
+        output = subprocess.check_output(["pgrep", "-l", "xfce4-session"])
+        return 'ubuntu:xfce4'
+    except subprocess.CalledProcessError:
+        print("subprocess pgrep xfce4-session failed")
+
+def set_background(image_path):
+    de = get_desktop_env()
+    if "xfce" in de:
+        set_xfce_background(image_path)
+    elif "gnome" in de:
+        set_gnome_background(image_path)
+    #else:
+    #    set_feh_background(image_path)  # fallback
+
 def set_gnome_background(image_path):
     uri = f"file://{image_path}"
     cmds = [
@@ -69,6 +90,38 @@ def set_gnome_background(image_path):
     for cmd in cmds:
         subprocess.run(cmd, check=True)
     print(f"Set desktop background to {image_path}")
+
+#/backdrop/screen0/monitor0/workspace0/last-image
+def set_xfce_background(wallpaper_path):
+    # Ensure the wallpaper path is absolute
+    wallpaper_path = os.path.abspath(os.path.expanduser(wallpaper_path))
+
+    try:
+        # Get all xfce4-desktop properties
+        output = subprocess.check_output(
+            ["xfconf-query", "-c", "xfce4-desktop", "-l"],
+            universal_newlines=True
+        )
+        # Filter for 'last-image' properties
+        props = [line for line in output.strip().split('\n') if 'last-image' in line]
+
+        # Set wallpaper for each last-image property
+        for prop in props:
+            subprocess.run([
+                "xfconf-query", "-c", "xfce4-desktop",
+                "-p", prop,
+                "-s", wallpaper_path
+            ], check=True)
+
+        # Reload desktop
+	# Don't seem to need this
+        #subprocess.run(["xfdesktop", "--reload"], check=True)
+
+        print("Wallpaper set successfully.")
+
+    except subprocess.CalledProcessError as e:
+        print("Error:", e)
+
 
 def is_valid_date(date_str):
     try:
@@ -94,6 +147,7 @@ def list_cached_apods():
 
 
 def main(date_str=None, set_bg=False, list_cached=False):
+
     # Handle --today
     if date_str == "__TODAY__":
         date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -116,7 +170,7 @@ def main(date_str=None, set_bg=False, list_cached=False):
     if date_str in data:
         image_path = data[date_str]["img"]
         if set_bg:
-            set_gnome_background(image_path)
+            set_background(image_path)
         print(f"Using cached APOD for {date_str} -> {image_path}\n")
         print(f"Title: {data[date_str].get('title', '')}\n")
         print(f"Explanation: {data[date_str].get('explanation', '')}")
@@ -143,7 +197,7 @@ def main(date_str=None, set_bg=False, list_cached=False):
     update_apod_json(date_str, apod_data, image_path)
 
     if set_bg:
-        set_gnome_background(image_path)
+        set_background(image_path)
 
     print(f"Saved APOD {date_str} -> {image_path}")
     print(f"Title: {apod_data.get('title', '')}\n")
