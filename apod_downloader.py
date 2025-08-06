@@ -73,7 +73,8 @@ def set_background(image_path):
     de = get_desktop_env()
     if "xfce" in de:
         set_xfce_background(image_path)
-    elif "gnome" in de:
+    elif "GNOME" in de:
+        print("Gnome detected")
         set_gnome_background(image_path)
     #else:
     #    set_feh_background(image_path)  # fallback
