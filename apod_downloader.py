@@ -173,6 +173,8 @@ def render_text_with_outline(text, font, text_color, outline_color, outline_widt
 def view_with_pygame(image_path, title="CosmoWall", explanation=None):
 
     pygame.init()
+    pygame.mouse.set_visible(False)
+
     #screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
     screen = pygame.display.set_mode((1400, 1200))  # Windowed mode
     screen_rect = screen.get_rect()
@@ -254,11 +256,106 @@ def view_with_pygame(image_path, title="CosmoWall", explanation=None):
 
     pygame.quit()
 
+def view_side_by_side_loop(apod_data_dict, start_date, fullscreen=False):
+    import pygame
+    import textwrap
+    from datetime import datetime
+
+    def render_apod(screen, screen_width, screen_height, text_area_width, image_path, title, explanation):
+        screen.fill((0, 0, 0))
+
+        # Load and scale image
+        image_area_width = screen_width - text_area_width
+        image_area = pygame.Rect(text_area_width, 0, image_area_width, screen_height)
+
+        try:
+            img = pygame.image.load(image_path)
+            img = pygame.transform.scale(img, (image_area.width, image_area.height))
+            screen.blit(img, (image_area.left, image_area.top))
+        except Exception as e:
+            print(f"Failed to load image: {e}")
+            return
+
+        # Fonts (scaled)
+        title_font_size = max(int(screen_height * 0.04), 32)
+        text_font_size = max(int(screen_height * 0.02), 26)
+        title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
+        text_font = pygame.font.SysFont("Arial", text_font_size)
+        line_spacing = int(text_font_size * 0.3)
+
+        # Wrap and render text
+        text_surfaces = []
+
+        # Title
+        title_surf = title_font.render(title, True, (255, 255, 255))
+        title_rect = title_surf.get_rect(centerx=text_area_width // 2)
+        text_surfaces.append((title_surf, title_rect))
+
+        # Explanation
+        wrapper = textwrap.TextWrapper(width=40)
+        lines = wrapper.wrap(explanation)
+        for line in lines:
+            surf = text_font.render(line, True, (200, 200, 200))
+            rect = surf.get_rect(centerx=text_area_width // 2)
+            text_surfaces.append((surf, rect))
+
+        # Vertical centering
+        total_text_height = sum(s.get_height() + line_spacing for s, _ in text_surfaces) - line_spacing + 20
+        start_y = (screen_height - total_text_height) // 2
+
+        # Blit text
+        for i, (surf, rect) in enumerate(text_surfaces):
+            rect.top = start_y
+            screen.blit(surf, rect)
+            start_y += surf.get_height()
+            start_y += 20 if i == 0 else line_spacing
+
+        pygame.display.flip()
+
+    # Init pygame
+    pygame.init()
+    pygame.mouse.set_visible(False)
+
+    if fullscreen:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        screen_rect = screen.get_rect()
+    else:
+        screen = pygame.display.set_mode((1900, 1200))
+        screen_rect = screen.get_rect()
+
+    screen_width, screen_height = screen_rect.width, screen_rect.height
+    text_area_width = int(screen_width * 0.30)
+
+    # Sort dates
+    date_list = sorted(apod_data_dict.keys(), key=lambda d: datetime.strptime(d, "%Y-%m-%d"))
+    current_index = date_list.index(start_date) if start_date in date_list else 0
+
+    running = True
+    while running:
+        date_str = date_list[current_index]
+        entry = apod_data_dict[date_str]
+        image_path = entry["img"]
+        title = entry.get("title", "")
+        explanation = entry.get("explanation", "")
+
+        render_apod(screen, screen_width, screen_height, text_area_width, image_path, title, explanation)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click = next image
+                    current_index = (current_index + 1) % len(date_list)
+
+    pygame.quit()
+
+
 def view_side_by_side(image_path, title="CosmoWall", explanation=None, fullscreen=False):
     import pygame
     import textwrap
 
     pygame.init()
+    pygame.mouse.set_visible(False)
 
     if fullscreen:
         screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -349,8 +446,7 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None, fullscree
 
     pygame.quit()
 
-def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False, fullscreen=False):
-
+def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False, fullscreen=False, loop=False):
 
     # Handle --today
     if date_str == "__TODAY__":
@@ -378,6 +474,9 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
         if show_feh:
             show_with_feh(image_path)
         if show_cosmowall:
+            if loop:
+                view_side_by_side_loop(data, date_str, fullscreen)
+
             title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
             explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
             if side_by_side:
@@ -441,6 +540,7 @@ if __name__ == "__main__":
     parser.add_argument("--cosmowall", action="store_true", help="View the APOD image using the CosmoWall pygame viewer")
     parser.add_argument("--side-by-side", action="store_true", help="View APOD image and explanation in side-by-side layout")
     parser.add_argument("--fullscreen", action="store_true", help="Fullscreen mode")
+    parser.add_argument("--loop", action="store_true", help="Loop mode")
 
     args = parser.parse_args()
 
@@ -458,6 +558,6 @@ if __name__ == "__main__":
     show_feh=args.feh,
     show_cosmowall=args.cosmowall,
     side_by_side=args.side_by_side,
-    fullscreen=args.fullscreen
+    fullscreen=args.fullscreen,
+    loop=args.loop
     )
- 
