@@ -3,7 +3,9 @@
 import os
 import sys
 import json
+import pygame
 import requests
+import textwrap
 import subprocess
 from datetime import datetime,timezone
 from pathlib import Path
@@ -151,9 +153,24 @@ def show_with_feh(image_path):
     except subprocess.CalledProcessError as e:
         print(f"Failed to display image with feh: {e}")
 
+def render_text_with_outline(text, font, text_color, outline_color, outline_width=1):
+    base = font.render(text, True, text_color)
+    size = (base.get_width() + outline_width * 2, base.get_height() + outline_width * 2)
+    outline_surface = pygame.Surface(size, pygame.SRCALPHA)
+
+    # Render outline in 8 directions
+    for dx in [-outline_width, 0, outline_width]:
+        for dy in [-outline_width, 0, outline_width]:
+            if dx != 0 or dy != 0:
+                pos = (dx + outline_width, dy + outline_width)
+                outline_surface.blit(font.render(text, True, outline_color), pos)
+
+    # Render the main text in the center
+    outline_surface.blit(base, (outline_width, outline_width))
+    return outline_surface
+
+
 def view_with_pygame(image_path, title="CosmoWall", explanation=None):
-    import pygame
-    import textwrap
 
     pygame.init()
     #screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
@@ -176,7 +193,8 @@ def view_with_pygame(image_path, title="CosmoWall", explanation=None):
     line_height = text_font.get_height() + 6
 
     # Render title
-    title_surface = title_font.render(title, True, (255, 255, 255))
+    #title_surface = title_font.render(title, True, (255, 255, 255))
+    title_surface = render_text_with_outline(title, title_font, (255, 255, 255), (0, 0, 0), 1)
     title_rect = title_surface.get_rect(center=(screen_rect.centerx, 60))
 
     # Render wrapped explanation
@@ -197,7 +215,9 @@ def view_with_pygame(image_path, title="CosmoWall", explanation=None):
         lines = wrapper.wrap(explanation)
 
         for line in lines:
-            surf = text_font.render(line, True, (255, 255, 255))
+            #surf = text_font.render(line, True, (255, 255, 255))
+            surf = render_text_with_outline(line, text_font, (255, 255, 255), (0, 0, 0), 1)
+
             rect = surf.get_rect(centerx=screen_rect.centerx)
             wrapped_lines.append((surf, rect))
 
