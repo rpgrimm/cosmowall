@@ -254,25 +254,33 @@ def view_with_pygame(image_path, title="CosmoWall", explanation=None):
 
     pygame.quit()
 
-def view_side_by_side(image_path, title="CosmoWall", explanation=None):
+def view_side_by_side(image_path, title="CosmoWall", explanation=None, fullscreen=False):
     import pygame
     import textwrap
 
     pygame.init()
 
-    screen_width = 1900
-    screen_height = 1200
-    text_area_width = 500
+    if fullscreen:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        screen_rect = screen.get_rect()
+        screen_width = screen_rect.width
+        screen_height = screen_rect.height
+    else:
+        screen_width = 1900
+        screen_height = 1200
+        screen = pygame.display.set_mode((screen_width, screen_height))
+        screen_rect = screen.get_rect()
 
-    screen = pygame.display.set_mode((screen_width, screen_height))
     pygame.display.set_caption("CosmoWall: Side by Side")
 
     screen.fill((0, 0, 0))  # Clear screen
 
-    # Load and scale image to fit the right side
+    # Dynamically calculate text area width (e.g. 30% of screen)
+    text_area_width = int(screen_width * 0.30)
     image_area_width = screen_width - text_area_width
     image_area = pygame.Rect(text_area_width, 0, image_area_width, screen_height)
 
+    # Load and scale image
     try:
         img = pygame.image.load(image_path)
         img = pygame.transform.scale(img, (image_area.width, image_area.height))
@@ -281,10 +289,21 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None):
         print(f"Failed to load image: {e}")
         return
 
-    # Fonts
-    title_font = pygame.font.SysFont("Arial", 28, bold=True)
-    text_font = pygame.font.SysFont("Arial", 22)
-    line_spacing = 6
+    # Fonts (adjusted for higher resolution)
+    #title_font = pygame.font.SysFont("Arial", 50, bold=True)
+    #text_font = pygame.font.SysFont("Arial", 40)
+    #line_spacing = 4
+
+    # Fonts (scaled for resolution with higher minimums)
+    title_font_size = max(int(screen_height * 0.04), 18)
+    text_font_size = max(int(screen_height * 0.02), 16)
+    print(title_font_size)
+    print(text_font_size)
+
+    title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
+    text_font = pygame.font.SysFont("Arial", text_font_size)
+    line_spacing = int(text_font_size * 0.3)  # Spaced nicely
+
 
     # Wrap and render all text lines (title + explanation)
     text_surfaces = []
@@ -304,27 +323,21 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None):
             rect = surf.get_rect(centerx=text_area_width // 2)
             text_surfaces.append((surf, rect))
 
-    # Measure total height
-    total_text_height = sum(s.get_height() + line_spacing for s, _ in text_surfaces) - line_spacing
+    # Vertical centering
+    total_text_height = sum(s.get_height() + line_spacing for s, _ in text_surfaces) - line_spacing + 20
     start_y = (screen_height - total_text_height) // 2
 
     # Blit text surfaces
-    #for surf, rect in text_surfaces:
-    #    rect.top = start_y
-    #    screen.blit(surf, rect)
-    #    start_y += surf.get_height() + line_spacing
     for i, (surf, rect) in enumerate(text_surfaces):
         rect.top = start_y
         screen.blit(surf, rect)
         start_y += surf.get_height()
 
-        # Extra space between title and first line of explanation
         if i == 0:
-            start_y += 20
+            start_y += 20  # Extra space after title
         else:
             start_y += line_spacing
 
-
     pygame.display.flip()
 
     # Wait for quit
@@ -336,190 +349,7 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None):
 
     pygame.quit()
 
-
-def __view_side_by_side(image_path, title="CosmoWall", explanation=None):
-    import pygame
-    import textwrap
-
-    pygame.init()
-
-    screen_width = 1900
-    screen_height = 1200
-    text_area_width = 500
-
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption("CosmoWall: Side by Side")
-
-    screen.fill((0, 0, 0))  # Clear screen
-
-    # Load and scale image to fit the right side
-    image_area_width = screen_width - text_area_width
-    image_area = pygame.Rect(text_area_width, 0, image_area_width, screen_height)
-
-    try:
-        img = pygame.image.load(image_path)
-        img = pygame.transform.scale(img, (image_area.width, image_area.height))
-        screen.blit(img, (image_area.left, image_area.top))
-    except Exception as e:
-        print(f"Failed to load image: {e}")
-        return
-
-    # Fonts
-    title_font = pygame.font.SysFont("Arial", 30, bold=True)
-    text_font = pygame.font.SysFont("Arial", 24)
-    line_spacing = 6
-
-    # Render title
-    y = 20
-    title_surf = title_font.render(title, True, (255, 255, 255))
-    title_rect = title_surf.get_rect(centerx=text_area_width // 2)
-    title_rect.top = y
-    screen.blit(title_surf, title_rect)
-    y = title_rect.bottom + 20
-
-    # Render wrapped explanation text (centered)
-    if explanation:
-        wrapper = textwrap.TextWrapper(width=40)
-        lines = wrapper.wrap(explanation)
-
-        for line in lines:
-            text_surf = text_font.render(line, True, (200, 200, 200))
-            text_rect = text_surf.get_rect(centerx=text_area_width // 2)
-            text_rect.top = y
-            screen.blit(text_surf, text_rect)
-            y += text_surf.get_height() + line_spacing
-            if y > screen_height - 40:
-                break  # Prevent overflow
-
-    pygame.display.flip()
-
-    # Wait for quit
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                running = False
-
-    pygame.quit()
-
-
-def _view_side_by_side(image_path, title="CosmoWall", explanation=None):
-    import pygame
-    import textwrap
-
-    pygame.init()
-
-    screen_width = 1280
-    screen_height = 720
-    text_area_width = 500
-
-    screen = pygame.display.set_mode((screen_width, screen_height))
-    pygame.display.set_caption("CosmoWall: Side by Side")
-
-    screen.fill((0, 0, 0))  # Clear screen
-
-    # Load and scale image to fit the right side
-    image_area_width = screen_width - text_area_width
-    image_area = pygame.Rect(text_area_width, 0, image_area_width, screen_height)
-
-    try:
-        img = pygame.image.load(image_path)
-        img = pygame.transform.scale(img, (image_area.width, image_area.height))
-        screen.blit(img, (image_area.left, image_area.top))
-    except Exception as e:
-        print(f"Failed to load image: {e}")
-        return
-
-    # Draw black rectangle for text area (optional since background is black)
-    text_area = pygame.Rect(0, 0, text_area_width, screen_height)
-    pygame.draw.rect(screen, (0, 0, 0), text_area)
-
-    # Fonts
-    title_font = pygame.font.SysFont("Arial", 30, bold=True)
-    text_font = pygame.font.SysFont("Arial", 24)
-    line_spacing = 6
-
-    # Render title
-    y = 20
-    title_surf = title_font.render(title, True, (255, 255, 255))
-    screen.blit(title_surf, (20, y))
-    y += title_surf.get_height() + 20
-
-    # Render wrapped explanation text
-    if explanation:
-        wrapper = textwrap.TextWrapper(width=40)
-        lines = wrapper.wrap(explanation)
-
-        for line in lines:
-            text_surf = text_font.render(line, True, (200, 200, 200))
-            screen.blit(text_surf, (20, y))
-            y += text_surf.get_height() + line_spacing
-            if y > screen_height - 40:
-                break  # Avoid overflowing the text area
-
-    pygame.display.flip()
-
-    # Wait for key or mouse to quit
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                running = False
-
-    pygame.quit()
-
-
-
-def _view_with_pygame(image_path, title="CosmoWall", explanation="CosmoWall Explanation"):
-    import pygame
-
-    pygame.init()
-    
-    #screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
-    screen = pygame.display.set_mode((1200, 900))  # Windowed mode
-    screen_rect = screen.get_rect()
-    pygame.display.set_caption("CosmoWall")
-
-    try:
-        img = pygame.image.load(image_path)
-        img = pygame.transform.scale(img, screen_rect.size)
-    except Exception as e:
-        print(f"Error loading image in pygame: {e}")
-        return
-
-    screen.blit(img, (0, 0))
-
-    # Draw title overlay
-    font = pygame.font.SysFont("Arial", 36)
-    #text_surface = font.render(title, True, (255, 255, 255))
-    text_surface = font.render(explanation, True, (255, 255, 255))
-    text_bg = pygame.Surface((text_surface.get_width() + 20, text_surface.get_height() + 10))
-    text_bg.set_alpha(180)
-    text_bg.fill((0, 0, 0))
-
-    text_rect = text_surface.get_rect()
-    text_bg_rect = text_bg.get_rect()
-    text_bg_rect.centerx = screen_rect.centerx
-    text_bg_rect.bottom = screen_rect.bottom - 40
-    text_rect.center = text_bg_rect.center
-
-    screen.blit(text_bg, text_bg_rect)
-    screen.blit(text_surface, text_rect)
-
-    pygame.display.flip()
-
-    # Wait for any key/mouse
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
-                running = False
-
-    pygame.quit()
-
-
-
-def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False):
+def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False, fullscreen=False):
 
 
     # Handle --today
@@ -551,7 +381,7 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
             title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
             explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
             if side_by_side:
-                view_side_by_side(image_path, title, explanation)
+                view_side_by_side(image_path, title, explanation, fullscreen)
             else:
                 view_with_pygame(image_path, title, explanation)
 
@@ -591,10 +421,9 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
         title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
         explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
         if side_by_side:
-            view_side_by_side(image_path, title, explanation)
+            view_side_by_side(image_path, title, explanation, fullscreen)
         else:
             view_with_pygame(image_path, title, explanation)
-
 
     print(f"Saved APOD {date_str} -> {image_path}")
     print(f"Title: {apod_data.get('title', '')}\n")
@@ -611,7 +440,7 @@ if __name__ == "__main__":
     parser.add_argument("--feh", action="store_true", help="Display the APOD image using feh in fullscreen with auto-zoom")
     parser.add_argument("--cosmowall", action="store_true", help="View the APOD image using the CosmoWall pygame viewer")
     parser.add_argument("--side-by-side", action="store_true", help="View APOD image and explanation in side-by-side layout")
-
+    parser.add_argument("--fullscreen", action="store_true", help="Fullscreen mode")
 
     args = parser.parse_args()
 
@@ -628,6 +457,7 @@ if __name__ == "__main__":
     list_cached=args.list_cached,
     show_feh=args.feh,
     show_cosmowall=args.cosmowall,
-    side_by_side=args.side_by_side
+    side_by_side=args.side_by_side,
+    fullscreen=args.fullscreen
     )
  
