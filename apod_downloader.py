@@ -145,9 +145,147 @@ def list_cached_apods():
         explanation = entry.get("explanation", "No explanation")
         print(f"🗓️ {date_str}: {title}\n   {explanation[:200]}...\n")
 
+def show_with_feh(image_path):
+    try:
+        subprocess.run(["feh", "--fullscreen", "--auto-zoom", image_path], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to display image with feh: {e}")
+
+def view_with_pygame(image_path, title="CosmoWall", explanation=None):
+    import pygame
+    import textwrap
+
+    pygame.init()
+    #screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen = pygame.display.set_mode((1400, 1200))  # Windowed mode
+    screen_rect = screen.get_rect()
+    pygame.display.set_caption("CosmoWall")
+
+    try:
+        img = pygame.image.load(image_path)
+        img = pygame.transform.scale(img, screen_rect.size)
+    except Exception as e:
+        print(f"Error loading image in pygame: {e}")
+        return
+
+    screen.blit(img, (0, 0))
+
+    # Font setup
+    title_font = pygame.font.SysFont("Arial", 42)
+    text_font = pygame.font.SysFont("Arial", 28)
+    line_height = text_font.get_height() + 6
+
+    # Render title
+    title_surface = title_font.render(title, True, (255, 255, 255))
+    title_rect = title_surface.get_rect(center=(screen_rect.centerx, 60))
+
+    # Render wrapped explanation
+    #wrapped_lines = []
+    #if explanation:
+    #    max_width = screen_rect.width - 100
+    #    wrapper = textwrap.TextWrapper(width=90)
+    #    lines = wrapper.wrap(explanation)
+
+    #    for line in lines:
+    #        surf = text_font.render(line, True, (255, 255, 255))
+    #        wrapped_lines.append(surf)
+
+    # Render wrapped explanation
+    wrapped_lines = []
+    if explanation:
+        wrapper = textwrap.TextWrapper(width=90)
+        lines = wrapper.wrap(explanation)
+
+        for line in lines:
+            surf = text_font.render(line, True, (255, 255, 255))
+            rect = surf.get_rect(centerx=screen_rect.centerx)
+            wrapped_lines.append((surf, rect))
 
 
-def main(date_str=None, set_bg=False, list_cached=False):
+    # Draw background strip at bottom
+    total_text_height = len(wrapped_lines) * line_height + 80
+    text_bg = pygame.Surface((screen_rect.width, total_text_height))
+    #text_bg.set_alpha(180)
+    text_bg.set_alpha(0)
+    text_bg.fill((0, 0, 0))
+    screen.blit(text_bg, (0, screen_rect.height - total_text_height))
+
+    # Blit title
+    screen.blit(title_surface, title_rect)
+
+    # Blit each wrapped line at bottom
+    #start_y = screen_rect.height - total_text_height + 60
+    #for i, line in enumerate(wrapped_lines):
+    #    screen.blit(line, (50, start_y + i * line_height))
+    start_y = screen_rect.height - total_text_height + 60
+    for i, (surf, rect) in enumerate(wrapped_lines):
+        rect.top = start_y + i * line_height
+        screen.blit(surf, rect)
+
+
+    pygame.display.flip()
+
+    # Wait for key or mouse
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
+                running = False
+
+    pygame.quit()
+
+
+def _view_with_pygame(image_path, title="CosmoWall", explanation="CosmoWall Explanation"):
+    import pygame
+
+    pygame.init()
+    
+    #screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    screen = pygame.display.set_mode((1200, 900))  # Windowed mode
+    screen_rect = screen.get_rect()
+    pygame.display.set_caption("CosmoWall")
+
+    try:
+        img = pygame.image.load(image_path)
+        img = pygame.transform.scale(img, screen_rect.size)
+    except Exception as e:
+        print(f"Error loading image in pygame: {e}")
+        return
+
+    screen.blit(img, (0, 0))
+
+    # Draw title overlay
+    font = pygame.font.SysFont("Arial", 36)
+    #text_surface = font.render(title, True, (255, 255, 255))
+    text_surface = font.render(explanation, True, (255, 255, 255))
+    text_bg = pygame.Surface((text_surface.get_width() + 20, text_surface.get_height() + 10))
+    text_bg.set_alpha(180)
+    text_bg.fill((0, 0, 0))
+
+    text_rect = text_surface.get_rect()
+    text_bg_rect = text_bg.get_rect()
+    text_bg_rect.centerx = screen_rect.centerx
+    text_bg_rect.bottom = screen_rect.bottom - 40
+    text_rect.center = text_bg_rect.center
+
+    screen.blit(text_bg, text_bg_rect)
+    screen.blit(text_surface, text_rect)
+
+    pygame.display.flip()
+
+    # Wait for any key/mouse
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN, pygame.QUIT):
+                running = False
+
+    pygame.quit()
+
+
+
+def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False):
+
 
     # Handle --today
     if date_str == "__TODAY__":
@@ -172,6 +310,13 @@ def main(date_str=None, set_bg=False, list_cached=False):
         image_path = data[date_str]["img"]
         if set_bg:
             set_background(image_path)
+        if show_feh:
+            show_with_feh(image_path)
+        if show_cosmowall:
+            title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
+            explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
+            view_with_pygame(image_path, title, explanation)
+
         print(f"Using cached APOD for {date_str} -> {image_path}\n")
         print(f"Title: {data[date_str].get('title', '')}\n")
         print(f"Explanation: {data[date_str].get('explanation', '')}")
@@ -200,6 +345,13 @@ def main(date_str=None, set_bg=False, list_cached=False):
     if set_bg:
         set_background(image_path)
 
+    if show_feh:
+        show_with_feh(image_path)
+
+    if show_cosmowall:
+        title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
+        view_with_pygame(image_path, title)
+
     print(f"Saved APOD {date_str} -> {image_path}")
     print(f"Title: {apod_data.get('title', '')}\n")
     print(f"Explanation: {apod_data.get('explanation', '')}\n")
@@ -212,6 +364,9 @@ if __name__ == "__main__":
     parser.add_argument("--set-bg", action="store_true", help="Set the APOD image as GNOME background")
     parser.add_argument("--list-cached", action="store_true", help="List cached APOD images")
     parser.add_argument("--today", action="store_true", help="Shortcut for today's date")
+    parser.add_argument("--feh", action="store_true", help="Display the APOD image using feh in fullscreen with auto-zoom")
+    parser.add_argument("--cosmowall", action="store_true", help="View the APOD image using the CosmoWall pygame viewer")
+
     args = parser.parse_args()
 
     # Determine date argument
@@ -221,4 +376,11 @@ if __name__ == "__main__":
     elif args.date:
         date_arg = args.date
 
-    main(date_arg, set_bg=args.set_bg, list_cached=args.list_cached)
+    main(
+        date_arg,
+        set_bg=args.set_bg,
+        list_cached=args.list_cached,
+        show_feh=args.feh,
+        show_cosmowall=args.cosmowall,
+    )
+
