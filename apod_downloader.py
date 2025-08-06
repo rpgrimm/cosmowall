@@ -344,8 +344,11 @@ def view_side_by_side_loop(apod_data_dict, start_date, fullscreen=False):
             if event.type == pygame.QUIT or event.type == pygame.KEYDOWN:
                 running = False
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click = next image
+                if event.button == 1:  # Left click → next
                     current_index = (current_index + 1) % len(date_list)
+                elif event.button == 3:  # Right click → previous
+                    current_index = (current_index - 1) % len(date_list)
+
 
     pygame.quit()
 
