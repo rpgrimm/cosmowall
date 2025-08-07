@@ -1,5 +1,5 @@
 # cosmowall
-export NASA_API_KEY=<Your NASA API key>
+export NASA_API_KEY="Your NASA API key"
 
 ./apod_downloader.py --set-bg --today
 
