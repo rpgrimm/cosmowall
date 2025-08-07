@@ -256,6 +256,107 @@ def view_with_pygame(image_path, title="CosmoWall", explanation=None):
 
     pygame.quit()
 
+def view_cosmowall_layout(apod_data_dict, start_date, fullscreen=False):
+    import pygame
+    import textwrap
+    from datetime import datetime
+
+    def render_apod(screen, screen_width, screen_height, title_height, text_width,
+                    image_path, title, explanation):
+        screen.fill((0, 0, 0))
+
+        # Fonts (scaled)
+        title_font_size = max(int(screen_height * 0.04), 36)
+        text_font_size = max(int(screen_height * 0.03), 26)
+        title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
+        text_font = pygame.font.SysFont("Arial", text_font_size)
+        line_spacing = int(text_font_size * 0.3)
+
+        # --- Title bar ---
+        title_rect = pygame.Rect(0, 0, screen_width, title_height)
+        pygame.draw.rect(screen, (0, 0, 0), title_rect)
+        title_surf = title_font.render(title, True, (255, 255, 255))
+        title_surf_rect = title_surf.get_rect(center=(screen_width // 2, title_height // 2))
+        screen.blit(title_surf, title_surf_rect)
+
+        # --- Explanation column ---
+        explanation_area = pygame.Rect(0, title_height, text_width, screen_height - title_height)
+        pygame.draw.rect(screen, (0, 0, 0), explanation_area)
+
+        # Wrap and render text
+        text_surfaces = []
+        wrapper = textwrap.TextWrapper(width=40)
+        lines = wrapper.wrap(explanation)
+
+        for line in lines:
+            surf = text_font.render(line, True, (200, 200, 200))
+            rect = surf.get_rect(centerx=explanation_area.width // 2)
+            text_surfaces.append((surf, rect))
+
+        total_text_height = sum(s.get_height() + line_spacing for s, _ in text_surfaces) - line_spacing
+        start_y = explanation_area.top + (explanation_area.height - total_text_height) // 2
+
+        for surf, rect in text_surfaces:
+            rect.top = start_y
+            screen.blit(surf, rect)
+            start_y += surf.get_height() + line_spacing
+
+        # --- Image area ---
+        image_area = pygame.Rect(text_width, title_height,
+                                 screen_width - text_width, screen_height - title_height)
+
+        try:
+            img = pygame.image.load(image_path)
+            img = pygame.transform.scale(img, (image_area.width, image_area.height))
+            screen.blit(img, (image_area.left, image_area.top))
+        except Exception as e:
+            print(f"Failed to load image: {e}")
+
+        pygame.display.flip()
+
+    # Init
+    pygame.init()
+    pygame.mouse.set_visible(False)
+
+    if fullscreen:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+    else:
+        screen = pygame.display.set_mode((1900, 1200))
+
+    screen_rect = screen.get_rect()
+    screen_width, screen_height = screen_rect.width, screen_rect.height
+
+    # Layout constants (percentages of screen)
+    title_height = int(screen_height * 0.12)
+    text_width = int(screen_width * 0.33)
+
+    # Sort cached APODs
+    date_list = sorted(apod_data_dict.keys(), key=lambda d: datetime.strptime(d, "%Y-%m-%d"))
+    current_index = date_list.index(start_date) if start_date in date_list else 0
+
+    running = True
+    while running:
+        date_str = date_list[current_index]
+        entry = apod_data_dict[date_str]
+        image_path = entry["img"]
+        title = entry.get("title", "")
+        explanation = entry.get("explanation", "")
+
+        render_apod(screen, screen_width, screen_height, title_height, text_width,
+                    image_path, title, explanation)
+
+        for event in pygame.event.get():
+            if event.type in (pygame.QUIT, pygame.KEYDOWN):
+                running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click = next
+                    current_index = (current_index + 1) % len(date_list)
+                elif event.button == 3:  # Right click = previous
+                    current_index = (current_index - 1) % len(date_list)
+
+    pygame.quit()
+
+
 def view_side_by_side_loop(apod_data_dict, start_date, fullscreen=False):
     import pygame
     import textwrap
@@ -348,7 +449,6 @@ def view_side_by_side_loop(apod_data_dict, start_date, fullscreen=False):
                     current_index = (current_index + 1) % len(date_list)
                 elif event.button == 3:  # Right click → previous
                     current_index = (current_index - 1) % len(date_list)
-
 
     pygame.quit()
 
@@ -478,7 +578,13 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
             show_with_feh(image_path)
         if show_cosmowall:
             if loop:
-                view_side_by_side_loop(data, date_str, fullscreen)
+                #view_side_by_side_loop(data, date_str, fullscreen)
+                view_cosmowall_layout(
+                    apod_data_dict=data,
+                    start_date=date_str,
+                    fullscreen=fullscreen
+                )
+
 
             title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
             explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
