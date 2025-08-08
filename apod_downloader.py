@@ -267,7 +267,12 @@ def view_cosmowall_layout(apod_data_dict, start_date, fullscreen=False):
 
         # Fonts (scaled)
         title_font_size = max(int(screen_height * 0.04), 36)
-        text_font_size = max(int(screen_height * 0.03), 26)
+
+        #print("len explanation: %d" % len(explanation))
+        screen_height_multiplier = .03
+        if len(explanation) > 1000:
+            screen_height_multiplier = .02
+        text_font_size = max(int(screen_height * screen_height_multiplier), 26)
         title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
         text_font = pygame.font.SysFont("Arial", text_font_size)
         line_spacing = int(text_font_size * 0.3)
