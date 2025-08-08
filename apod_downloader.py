@@ -270,7 +270,7 @@ def view_cosmowall_layout(apod_data_dict, start_date, fullscreen=False):
 
         #print("len explanation: %d" % len(explanation))
         screen_height_multiplier = .03
-        if len(explanation) > 1000:
+        if len(explanation) > 800:
             screen_height_multiplier = .02
         text_font_size = max(int(screen_height * screen_height_multiplier), 26)
         title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
