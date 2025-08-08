@@ -503,8 +503,8 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None, fullscree
     # Fonts (scaled for resolution with higher minimums)
     title_font_size = max(int(screen_height * 0.04), 18)
     text_font_size = max(int(screen_height * 0.02), 16)
-    print(title_font_size)
-    print(text_font_size)
+    #print(title_font_size)
+    #print(text_font_size)
 
     title_font = pygame.font.SysFont("Arial", title_font_size, bold=True)
     text_font = pygame.font.SysFont("Arial", text_font_size)
