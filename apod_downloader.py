@@ -58,6 +58,7 @@ def update_apod_json(date_str, meta, image_path):
         "img": image_path
     }
     save_apod_json(data)
+    return data
 
 def get_desktop_env():
 
@@ -575,72 +576,54 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
     data = load_apod_json()
 
     # If image already exists in JSON, use it
-    if date_str in data:
-        image_path = data[date_str]["img"]
-        if set_bg:
-            set_background(image_path)
-        if show_feh:
-            show_with_feh(image_path)
-        if show_cosmowall:
-            if loop:
-                #view_side_by_side_loop(data, date_str, fullscreen)
-                view_cosmowall_layout(
-                    apod_data_dict=data,
-                    start_date=date_str,
-                    fullscreen=fullscreen
-                )
+    if not date_str in data:
 
+        print(f"{date_str} not in cache, fetching from APOD")  
+        # Otherwise, fetch and store new image
+        base_dir = APOD_DIR / date_str
+        base_dir.mkdir(parents=True, exist_ok=True)
 
-            title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
-            explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
-            if side_by_side:
-                view_side_by_side(image_path, title, explanation, fullscreen)
-            else:
-                view_with_pygame(image_path, title, explanation)
+        apod_data = fetch_apod_metadata(date_str)
+        media_type = apod_data.get("media_type")
 
+        if media_type != "image":
+            print(f"{date_str} is not an image (media_type={media_type}). Skipping download.")
+            print(f"{apod_data.get('Title')} .")
+            return
 
-        print(f"Using cached APOD for {date_str} -> {image_path}\n")
-        print(f"Title: {data[date_str].get('title', '')}\n")
-        print(f"Explanation: {data[date_str].get('explanation', '')}")
-        return
+        image_url = apod_data.get("hdurl") or apod_data.get("url")
+        if not image_url:
+            print(f"No image URL found for {date_str}")
+            return
 
-    # Otherwise, fetch and store new image
-    base_dir = APOD_DIR / date_str
-    base_dir.mkdir(parents=True, exist_ok=True)
+        image_path = download_image(image_url, base_dir)
+        data = update_apod_json(date_str, apod_data, image_path)
 
-    apod_data = fetch_apod_metadata(date_str)
-    media_type = apod_data.get("media_type")
+        print(f"Saved APOD {date_str} -> {image_path}")
+        print(f"Title: {apod_data.get('title', '')}\n")
+        print(f"Explanation: {apod_data.get('explanation', '')}\n")
 
-    if media_type != "image":
-        print(f"{date_str} is not an image (media_type={media_type}). Skipping download.")
-        print(f"{apod_data.get('Title')} .")
-        return
-
-    image_url = apod_data.get("hdurl") or apod_data.get("url")
-    if not image_url:
-        print(f"No image URL found for {date_str}")
-        return
-
-    image_path = download_image(image_url, base_dir)
-    update_apod_json(date_str, apod_data, image_path)
-
+    image_path = data[date_str]["img"]
     if set_bg:
         set_background(image_path)
-
     if show_feh:
         show_with_feh(image_path)
-
     if show_cosmowall:
+        if loop:
+            #view_side_by_side_loop(data, date_str, fullscreen)
+            view_cosmowall_layout(
+                apod_data_dict=data,
+                start_date=date_str,
+                fullscreen=fullscreen
+            )
+
+
         title = data[date_str]["title"] if date_str in data else apod_data.get("title", "CosmoWall")
         explanation = data[date_str]["explanation"] if date_str in data else apod_data.get("explanation", "CosmoWall Explanation")
         if side_by_side:
             view_side_by_side(image_path, title, explanation, fullscreen)
         else:
             view_with_pygame(image_path, title, explanation)
-
-    print(f"Saved APOD {date_str} -> {image_path}")
-    print(f"Title: {apod_data.get('title', '')}\n")
-    print(f"Explanation: {apod_data.get('explanation', '')}\n")
 
 if __name__ == "__main__":
     import argparse
