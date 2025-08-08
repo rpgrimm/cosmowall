@@ -7,9 +7,11 @@ import pygame
 import requests
 import textwrap
 import subprocess
-from datetime import datetime,timezone
 from pathlib import Path
 from urllib.parse import urlparse
+from datetime import datetime,timezone
+
+from narratron import Narratron
 
 NASA_API_KEY = os.getenv("NASA_API_KEY")
 if not NASA_API_KEY:
@@ -18,6 +20,58 @@ if not NASA_API_KEY:
 
 APOD_DIR = Path.home() / "Pictures" / "apod"
 APOD_JSON = APOD_DIR / "apod.json"
+
+def sanitize_stem(name: str) -> str:
+    # keeps it filesystem-friendly
+    stem = Path(name).stem
+    safe = "".join(c if (c.isalnum() or c in "-_.") else "_" for c in stem)
+    return safe or "apod"
+
+def build_mp3_path_for_image(image_path: str) -> Path:
+    p = Path(image_path)
+    return p.with_suffix(".mp3")
+
+def ensure_apod_audio(date_str: str, entry: dict, voice_id: str, force: bool = False) -> Path:
+    """
+    Create (or reuse) an MP3 for this APOD, store path under entry['mp3'], and persist JSON.
+    Uses Narratron.voice_process_text_input(text, voice_id, output=<mp3 path>).
+    """
+    image_path = entry.get("img")
+    if not image_path:
+        raise RuntimeError(f"No image path for {date_str}; cannot create audio.")
+
+    mp3_path = build_mp3_path_for_image(image_path)
+
+    if mp3_path.exists() and not force:
+        # already cached; make sure JSON points to it
+        if entry.get("mp3") != str(mp3_path):
+            data = load_apod_json()
+            data[date_str]["mp3"] = str(mp3_path)
+            save_apod_json(data)
+        return mp3_path
+
+    # Build text: title + explanation
+    title = entry.get("title", "").strip()
+    explanation = entry.get("explanation", "").strip()
+    text = f"{title}\n\n{explanation}".strip() or "Astronomy Picture of the Day."
+
+    # Make sure the directory exists
+    mp3_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Call Narratron
+    nar = Narratron()
+    print(f"Generating {mp3_path}")
+    nar.voice_process_text_input(text=text, voice_id=voice_id, output=str(mp3_path))
+
+    # Update JSON
+    data = load_apod_json()
+    if date_str not in data:
+        data[date_str] = {}
+    data[date_str]["mp3"] = str(mp3_path)
+    save_apod_json(data)
+
+    return mp3_path
+
 
 def fetch_apod_metadata(date_str):
     url = "https://api.nasa.gov/planetary/apod"
@@ -354,11 +408,19 @@ def view_cosmowall_layout(apod_data_dict, start_date, fullscreen=False):
         for event in pygame.event.get():
             if event.type in (pygame.QUIT, pygame.KEYDOWN):
                 running = False
+
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click = next
+                if event.button == 1:  # Left click → next image
                     current_index = (current_index + 1) % len(date_list)
-                elif event.button == 3:  # Right click = previous
+                elif event.button == 3:  # Right click → previous
                     current_index = (current_index - 1) % len(date_list)
+                elif event.button == 2:  # Middle click → play audio
+                    entry = apod_data_dict[date_str]
+                    mp3_path = entry.get("mp3")
+                    if mp3_path and Path(mp3_path).exists():
+                        play_audio_nonblocking(mp3_path)
+                    else:
+                        print("No audio file found for this APOD")
 
     pygame.quit()
 
@@ -555,7 +617,24 @@ def view_side_by_side(image_path, title="CosmoWall", explanation=None, fullscree
 
     pygame.quit()
 
-def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False, fullscreen=False, loop=False):
+def play_audio_nonblocking(mp3_path):
+    """
+    Launch cvlc in the background so it plays once and exits,
+    without blocking the main pygame loop.
+    """
+    try:
+        subprocess.Popen(
+            ["cvlc", "--play-and-exit", mp3_path],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        print(f"Playing audio in background: {mp3_path}")
+    except Exception as e:
+        print(f"Failed to play audio: {e}")
+
+
+def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_cosmowall=False, side_by_side=False, fullscreen=False, loop=False,
+             make_audio=False, force_audio=False, voice_id="vGXjfeBcfruJsIPYQicx", play_audio=False):
 
     # Handle --today
     if date_str == "__TODAY__":
@@ -604,6 +683,31 @@ def main(date_str=None, set_bg=False, list_cached=False, show_feh=False, show_co
         print(f"Explanation: {apod_data.get('explanation', '')}\n")
 
     image_path = data[date_str]["img"]
+    # At this point, data[date_str] exists
+    if make_audio:
+        try:
+            mp3_path = ensure_apod_audio(
+                date_str=date_str,
+                entry=data[date_str],
+                voice_id=voice_id,
+                force=force_audio
+            )
+            print(f"Audio cached: {mp3_path}")
+        except Exception as e:
+            print(f"Failed to generate audio: {e}")
+
+    if play_audio:
+        mp3_path = data[date_str].get("mp3")
+        if not mp3_path or not Path(mp3_path).exists():
+            print("No cached audio found — generating...")
+            mp3_path = ensure_apod_audio(
+                date_str=date_str,
+                entry=data[date_str],
+                voice_id=voice_id,
+                force=False
+            )
+        play_audio_nonblocking(mp3_path)
+
     if set_bg:
         set_background(image_path)
     if show_feh:
@@ -638,6 +742,10 @@ if __name__ == "__main__":
     parser.add_argument("--side-by-side", action="store_true", help="View APOD image and explanation in side-by-side layout")
     parser.add_argument("--fullscreen", action="store_true", help="Fullscreen mode")
     parser.add_argument("--loop", action="store_true", help="Loop mode")
+    parser.add_argument("--make-audio", action="store_true", help="Generate mp3 for the APOD and cache it")
+    parser.add_argument("--force-audio", action="store_true", help="Overwrite an existing mp3 cache for this APOD")
+    parser.add_argument("--voice-id", default="vGXjfeBcfruJsIPYQicx", help="Narratron/ElevenLabs voice_id to use")
+    parser.add_argument("--play-audio", action="store_true", help="Play the APOD mp3 once using cvlc")
 
     args = parser.parse_args()
 
@@ -649,12 +757,17 @@ if __name__ == "__main__":
         date_arg = args.date
 
     main(
-    date_arg,
-    set_bg=args.set_bg,
-    list_cached=args.list_cached,
-    show_feh=args.feh,
-    show_cosmowall=args.cosmowall,
-    side_by_side=args.side_by_side,
-    fullscreen=args.fullscreen,
-    loop=args.loop
+        date_arg,
+        set_bg=args.set_bg,
+        list_cached=args.list_cached,
+        show_feh=args.feh,
+        show_cosmowall=args.cosmowall,
+        side_by_side=args.side_by_side,
+        fullscreen=args.fullscreen,
+        loop=args.loop,
+        make_audio=args.make_audio,
+        force_audio=args.force_audio,
+        voice_id=args.voice_id,
+        play_audio=args.play_audio,
     )
+
